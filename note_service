@@ -1,1 +1,56 @@
-# cs361
+import zmq
+
+def note_service():
+    context = zmq.Context()
+    socket = context.socket(zmq.REP)  # Reply socket
+    socket.bind("tcp://*:5555")
+
+    notes = {}
+    note_counter = 1  # Counter for generating unique note IDs
+
+    while True:
+        # Wait for the next request from the client
+        message = socket.recv_json()
+        action = message.get('action')
+
+        if action == 'create':
+            note_content = message.get('content')
+            note_id = note_counter
+            notes[note_id] = note_content
+            note_counter += 1  # Increment for next unique ID
+            print(f"Note created: {note_id} - {note_content}")
+            socket.send_json({"note_id": note_id, "note": note_content})
+
+        elif action == 'get':
+            note_id = message.get('id')
+            note_content = notes.get(note_id)
+            if note_content is not None:
+                socket.send_json({"note": note_content})
+            else:
+                socket.send_json({"message": "Note not found."})
+
+        elif action == 'delete':
+            note_id = message.get('id')
+            if note_id in notes:
+                del notes[note_id]
+                socket.send_json({"message": "Note deleted."})
+            else:
+                socket.send_json({"message": "Note not found."})
+
+        elif action == "replace":
+            note_id = message.get('id')  # Get the note ID from the message
+            new_content = message.get('content')
+            if note_id in notes:  # Check if the note ID exists
+                notes[note_id] = new_content
+                socket.send_json({"note_id": note_id, "note": new_content})
+            else:
+                socket.send_json({"message": "Note not found."})
+
+        else:
+            socket.send_json({"status": "error", "message": "Unknown action"})
+
+if __name__ == "__main__":
+    note_service()
+
+
+
